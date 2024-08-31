@@ -55,15 +55,21 @@ func (c *Client) Emit(event string, data interface{}) error {
 		"data":  data,
 	})
 }
+
 func (c *Client) Listen() {
     for {
         _, message, err := c.conn.Conn.ReadMessage()
         if err != nil {
-            log.Println("Error reading message:", err)
+            if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+                log.Println("WebSocket connection closed normally.")
+            } else {
+                log.Println("Error reading message:", err)
+            }
             return
         }
 
-        // Try to unmarshal the message into a generic map
+        log.Println("Raw message received:", string(message))
+
         var parsedMessage map[string]interface{}
         err = json.Unmarshal(message, &parsedMessage)
         if err != nil {
@@ -71,14 +77,12 @@ func (c *Client) Listen() {
             continue
         }
 
-        // Check if the message has an event and data
         event, ok := parsedMessage["event"].(string)
         if !ok {
             log.Println("Received a message without an 'event' field:", parsedMessage)
             continue
         }
 
-        // Call the registered handler if it exists
         if handler, found := c.handlers[event]; found {
             handler(parsedMessage["data"])
         } else {
@@ -86,3 +90,4 @@ func (c *Client) Listen() {
         }
     }
 }
+
