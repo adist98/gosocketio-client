@@ -56,38 +56,65 @@ func (c *Client) Emit(event string, data interface{}) error {
 	})
 }
 
+
 func (c *Client) Listen() {
     for {
         _, message, err := c.conn.Conn.ReadMessage()
         if err != nil {
-            if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
-                log.Println("WebSocket connection closed normally.")
-            } else {
-                log.Println("Error reading message:", err)
-            }
+            log.Println("Error reading message:", err)
             return
         }
 
+        // Log the raw message for debugging
         log.Println("Raw message received:", string(message))
 
-        var parsedMessage map[string]interface{}
-        err = json.Unmarshal(message, &parsedMessage)
-        if err != nil {
-            log.Println("Error unmarshaling message:", err)
-            continue
-        }
+        // The first character indicates the packet type
+        packetType := message[0] - '0'
+        payload := message[1:]
 
-        event, ok := parsedMessage["event"].(string)
-        if !ok {
-            log.Println("Received a message without an 'event' field:", parsedMessage)
-            continue
-        }
+        switch packetType {
+        case 0: // Open packet
+            log.Println("Received 'open' packet")
+            var openPayload map[string]interface{}
+            err := json.Unmarshal(payload, &openPayload)
+            if err != nil {
+                log.Println("Error unmarshaling open packet:", err)
+                continue
+            }
+            log.Println("Open packet data:", openPayload)
 
-        if handler, found := c.handlers[event]; found {
-            handler(parsedMessage["data"])
-        } else {
-            log.Println("No handler found for event:", event)
+        case 40: // Connected to namespace
+            log.Println("Connected to namespace")
+            // Handle namespace connection, no additional payload expected
+
+        case 42: // Event message
+            log.Println("Received 'event' packet")
+            var eventPayload []interface{}
+            err := json.Unmarshal(payload, &eventPayload)
+            if err != nil {
+                log.Println("Error unmarshaling event packet:", err)
+                continue
+            }
+
+            // The event name is the first item in the array
+            eventName, ok := eventPayload[0].(string)
+            if !ok {
+                log.Println("Invalid event name in packet:", eventPayload)
+                continue
+            }
+
+            // The event data is the second item
+            if len(eventPayload) > 1 {
+                eventData := eventPayload[1]
+                if handler, found := c.handlers[eventName]; found {
+                    handler(eventData)
+                } else {
+                    log.Println("No handler found for event:", eventName)
+                }
+            }
+
+        default:
+            log.Println("Unknown packet type:", packetType)
         }
     }
 }
-
