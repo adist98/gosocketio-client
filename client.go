@@ -77,11 +77,12 @@ func (c *Client) Listen() {
             continue
         }
 
+        // Determine the packet type
         packetType := message[0] - '0'
         payload := message[1:]
 
         switch packetType {
-        case 0: // Open packet
+        case 0: // Open packet (handshake)
             log.Println("Received 'open' packet")
             var openPayload map[string]interface{}
             err := json.Unmarshal(payload, &openPayload)
@@ -91,25 +92,26 @@ func (c *Client) Listen() {
             }
             log.Println("Open packet data:", openPayload)
 
-            // Send namespace connection message immediately after open packet
+            // Send namespace connection message (40 means connect to namespace)
             err = c.conn.Conn.WriteMessage(1, []byte("40"))
             if err != nil {
                 log.Println("Error sending namespace connect message:", err)
                 return
             }
 
-        case 2: // Ping packet
+        case 40: // Connected to namespace
+            log.Println("Connected to namespace")
+            // Now you can start sending and receiving events
+
+        case 2: // Ping packet (Engine.IO)
             log.Println("Received 'ping' packet, sending 'pong'")
-            err := c.conn.Conn.WriteMessage(1, []byte("3"))
+            err := c.conn.Conn.WriteMessage(1, []byte("3")) // Pong response
             if err != nil {
                 log.Println("Error sending pong message:", err)
                 return
             }
 
-        case 40: // Connected to namespace
-            log.Println("Connected to namespace")
-
-        case 42: // Event message
+        case 42: // Event message (Socket.IO)
             log.Println("Received 'event' packet")
             var eventPayload []interface{}
             err := json.Unmarshal(payload, &eventPayload)
@@ -118,12 +120,14 @@ func (c *Client) Listen() {
                 continue
             }
 
+            // The first element is the event name
             eventName, ok := eventPayload[0].(string)
             if !ok {
                 log.Println("Invalid event name in packet:", eventPayload)
                 continue
             }
 
+            // The second element is the event data
             if len(eventPayload) > 1 {
                 eventData := eventPayload[1]
                 if handler, found := c.handlers[eventName]; found {
@@ -138,5 +142,4 @@ func (c *Client) Listen() {
         }
     }
 }
-
 
