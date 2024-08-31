@@ -62,10 +62,20 @@ func (c *Client) Listen() {
         _, message, err := c.conn.Conn.ReadMessage()
         if err != nil {
             log.Println("Error reading message:", err)
+            if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) {
+                log.Println("WebSocket connection closed normally.")
+            } else {
+                log.Println("Unexpected WebSocket close:", err)
+            }
             return
         }
 
         log.Println("Raw message received:", string(message))
+
+        if len(message) == 0 {
+            log.Println("Received empty message, skipping...")
+            continue
+        }
 
         packetType := message[0] - '0'
         payload := message[1:]
@@ -81,7 +91,7 @@ func (c *Client) Listen() {
             }
             log.Println("Open packet data:", openPayload)
 
-            // Send namespace connection message
+            // Send namespace connection message immediately after open packet
             err = c.conn.Conn.WriteMessage(1, []byte("40"))
             if err != nil {
                 log.Println("Error sending namespace connect message:", err)
@@ -128,4 +138,5 @@ func (c *Client) Listen() {
         }
     }
 }
+
 
