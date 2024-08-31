@@ -1,6 +1,7 @@
 package gosocketioclient
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
@@ -54,21 +55,34 @@ func (c *Client) Emit(event string, data interface{}) error {
 		"data":  data,
 	})
 }
-
 func (c *Client) Listen() {
-	for {
-		var message map[string]interface{}
-		err := c.conn.Conn.ReadJSON(&message)
-		if err != nil {
-			log.Println("Error reading message:", err)
-			return
-		}
+    for {
+        _, message, err := c.conn.Conn.ReadMessage()
+        if err != nil {
+            log.Println("Error reading message:", err)
+            return
+        }
 
-		event := message["event"].(string)
-		data := message["data"]
+        // Try to unmarshal the message into a generic map
+        var parsedMessage map[string]interface{}
+        err = json.Unmarshal(message, &parsedMessage)
+        if err != nil {
+            log.Println("Error unmarshaling message:", err)
+            continue
+        }
 
-		if handler, ok := c.handlers[event]; ok {
-			handler(data)
-		}
-	}
+        // Check if the message has an event and data
+        event, ok := parsedMessage["event"].(string)
+        if !ok {
+            log.Println("Received a message without an 'event' field:", parsedMessage)
+            continue
+        }
+
+        // Call the registered handler if it exists
+        if handler, found := c.handlers[event]; found {
+            handler(parsedMessage["data"])
+        } else {
+            log.Println("No handler found for event:", event)
+        }
+    }
 }
