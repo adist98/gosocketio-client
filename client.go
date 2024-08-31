@@ -1,7 +1,11 @@
 package gosocketioclient
 
 import (
-    "log"
+	"fmt"
+	"log"
+	"strings"
+
+	"github.com/gorilla/websocket"
 )
 
 type Client struct {
@@ -10,14 +14,31 @@ type Client struct {
     handlers map[string]func(interface{})
 }
 
+// NewClient creates a new Socket.IO client with the provided server URL.
 func NewClient(url string) (*Client, error) {
-    connection, err := NewConnection(url)
-    if err != nil {
-        return nil, err
+    // Ensure the URL includes the required Socket.IO query parameters
+    if !strings.Contains(url, "EIO=") {
+        if strings.Contains(url, "?") {
+            url += "&EIO=4&transport=websocket"
+        } else {
+            url += "?EIO=4&transport=websocket"
+        }
     }
+
+    // Establish the WebSocket connection
+    conn, _, err := websocket.DefaultDialer.Dial(url, nil)
+    if err != nil {
+        return nil, fmt.Errorf("failed to connect to Socket.IO server: %w", err)
+    }
+
+    // Wrap the WebSocket connection in your Connection struct
+    connection := &Connection{
+        Conn: conn,
+    }
+
+    // Return a new Client instance with the Connection
     return &Client{
-        conn:     connection,
-        handlers: make(map[string]func(interface{})),
+        conn: connection,
     }, nil
 }
 
