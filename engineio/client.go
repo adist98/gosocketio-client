@@ -61,6 +61,8 @@ func InitializePollingConnection(serverURL string) (*HandshakeResponse, error) {
         return nil, fmt.Errorf("failed to read handshake response: %v", err)
     }
 
+    log.Printf("Raw handshake response: %s", string(body))  // Log the raw response
+
     var handshakeData string
     if body[0] == '0' {
         colonIndex := bytes.IndexByte(body, ':')
@@ -81,6 +83,7 @@ func InitializePollingConnection(serverURL string) (*HandshakeResponse, error) {
 
     return &handshake, nil
 }
+
 
 func UpgradeToWebSocket(serverURL string, handshake *HandshakeResponse) (*EngineIOClient, error) {
     u, err := url.Parse(serverURL)
