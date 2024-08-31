@@ -21,6 +21,24 @@ type EngineIOClient struct {
     PingTimeout  int
 }
 
+// NewEngineIOClient initializes a new Engine.IO client
+func NewEngineIOClient(serverURL string) (*EngineIOClient, error) {
+    // Step 1: Initialize the connection using polling
+    handshake, err := InitializePollingConnection(serverURL)
+    if err != nil {
+        return nil, fmt.Errorf("failed to initialize polling connection: %v", err)
+    }
+
+    // Step 2: Upgrade the connection to WebSocket
+    client, err := UpgradeToWebSocket(serverURL, handshake)
+    if err != nil {
+        return nil, fmt.Errorf("failed to upgrade to WebSocket: %v", err)
+    }
+
+    log.Println("Successfully upgraded to WebSocket")
+    return client, nil
+}
+
 func InitializePollingConnection(serverURL string) (*HandshakeResponse, error) {
     u, err := url.Parse(serverURL)
     if err != nil {
