@@ -65,10 +65,8 @@ func (c *Client) Listen() {
             return
         }
 
-        // Log the raw message for debugging
         log.Println("Raw message received:", string(message))
 
-        // The first character indicates the packet type
         packetType := message[0] - '0'
         payload := message[1:]
 
@@ -83,9 +81,23 @@ func (c *Client) Listen() {
             }
             log.Println("Open packet data:", openPayload)
 
+            // Send namespace connection message
+            err = c.conn.Conn.WriteMessage(1, []byte("40"))
+            if err != nil {
+                log.Println("Error sending namespace connect message:", err)
+                return
+            }
+
+        case 2: // Ping packet
+            log.Println("Received 'ping' packet, sending 'pong'")
+            err := c.conn.Conn.WriteMessage(1, []byte("3"))
+            if err != nil {
+                log.Println("Error sending pong message:", err)
+                return
+            }
+
         case 40: // Connected to namespace
             log.Println("Connected to namespace")
-            // Handle namespace connection, no additional payload expected
 
         case 42: // Event message
             log.Println("Received 'event' packet")
@@ -96,14 +108,12 @@ func (c *Client) Listen() {
                 continue
             }
 
-            // The event name is the first item in the array
             eventName, ok := eventPayload[0].(string)
             if !ok {
                 log.Println("Invalid event name in packet:", eventPayload)
                 continue
             }
 
-            // The event data is the second item
             if len(eventPayload) > 1 {
                 eventData := eventPayload[1]
                 if handler, found := c.handlers[eventName]; found {
@@ -118,3 +128,4 @@ func (c *Client) Listen() {
         }
     }
 }
+
